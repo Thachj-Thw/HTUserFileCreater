@@ -5,6 +5,8 @@ from openpyxl.styles import Font, Color, Alignment, Border, Side
 from openpyxl.styles import borders
 from openpyxl.cell import Cell
 import module
+import re
+
 
 
 @dataclass
@@ -19,8 +21,8 @@ class InputStruct:
     name_column: str = "B"
     room_column: str = "B"
     car: Transportation = field(default_factory=lambda: Transportation("Ô tô", "C"))
-    moto: Transportation = field(default_factory=lambda: Transportation("Xe máy", "D"))
-    e_moto: Transportation = field(default_factory=lambda: Transportation("Xe máy điện", "E"))
+    moto: Transportation = field(default_factory=lambda: Transportation("XE MÁY CBCNV", "D"))
+    e_moto: Transportation = field(default_factory=lambda: Transportation("XE MÁY CBCNV", "E"))
 
 
 @dataclass
@@ -88,15 +90,34 @@ class UserFileCreater:
             if idx < max_idx and cell.row == rooms[idx + 1].row:
                 idx += 1
                 continue
-            self._split_license_plate(cell, rooms[idx].name, self.input_struct.car)
+            # self._split_license_plate(cell, rooms[idx].name, self.input_struct.car)
             self._split_license_plate(cell, rooms[idx].name, self.input_struct.moto)
             self._split_license_plate(cell, rooms[idx].name, self.input_struct.e_moto)
     
     def _split_license_plate(self, cell: Cell, room: str, transportation: Transportation) -> None:
         if license_plates := self.sheet[transportation.coloumn + str(cell.row)].value:
-            for license_plate in license_plates.split("\n"):
+            i = 0
+            licen = ""
+            all_license_plates = license_plates.split("\n")
+            for license_plate in all_license_plates:
                 if not license_plate:
                     continue
+                license_plate = auto_format(license_plate)
+                if i == 0:
+                    licen = license_plate
+                else:
+                    infomation = LicensePlateInfomation(cell.value, room, licen + ";" + license_plate, transportation.types, "Nhân viên")
+                    self.list_license.append(infomation)
+                    self._set_save_cell(self.output_struct.ordinal_column + str(self.save_row), 1 + self.save_row - self.output_struct.start_row)
+                    self._set_save_cell(self.output_struct.name_column + str(self.save_row), infomation.user, alignment="left")
+                    self._set_save_cell(self.output_struct.room_column + str(self.save_row), infomation.room)
+                    self._set_save_cell(self.output_struct.number_column + str(self.save_row), infomation.number)
+                    self._set_save_cell(self.output_struct.transportation_column + str(self.save_row), infomation.type)
+                    self._set_save_cell(self.output_struct.position_column + str(self.save_row), infomation.position)
+                    self.save_row += 1
+                i = (i + 1) % 2
+            if len(all_license_plates) % 2 != 0:
+                license_plate = auto_format(all_license_plates[-1])
                 infomation = LicensePlateInfomation(cell.value, room, license_plate, transportation.types, "Nhân viên")
                 self.list_license.append(infomation)
                 self._set_save_cell(self.output_struct.ordinal_column + str(self.save_row), 1 + self.save_row - self.output_struct.start_row)
@@ -117,3 +138,17 @@ class UserFileCreater:
         cell.alignment = alig
         cell.border = bor
         cell.value = value
+
+
+def auto_format(input_str: str) -> str:
+    output_lst = []
+    for chr in input_str:
+        if chr.isalnum():
+            output_lst.append(chr.upper())
+    if len(output_lst) == 8:
+        return "%s%s%s%s-%s%s%s%s" % tuple(output_lst)
+    elif len(output_lst) == 9:
+        return "%s%s%s%s-%s%s%s.%s%s" % tuple(output_lst)
+    elif len(output_lst) == 10:
+        return "%s%s%s%s%s-%s%s%s%s%s" % tuple(output_lst)
+    return input_str
